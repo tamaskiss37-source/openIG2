@@ -156,12 +156,17 @@ pub fn show(ctx: &egui::Context, v: &View, st: &mut State) -> Vec<Act> {
     // This leaves almost the full vertical space available for the technology list.
     // On narrower displays, retain the original stacked layout.
     let wide_layout = screen.width() >= 1450.0;
+    let triple_layout = screen.width() >= 2200.0;
+    let available_list_width = (screen.width() - INFO_W - 3.0 * ds::EDGE - 24.0).max(LIST_W);
+    let list_width = if triple_layout { available_list_width } else { LIST_W };
     let list_height = if wide_layout { room - 56.0 } else { room - 240.0 };
     let list = egui::Area::new(egui::Id::new("rmh-list")).fixed_pos(pos2(ds::EDGE, top)).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
-        ds::panel(ui, PanelKind::Deep, 0.88, 16.0, |ui| list(ui, v, list_height.max(26.0 * 4.0), &mut acts));
+        ds::panel(ui, PanelKind::Deep, 0.88, 16.0, |ui| list(ui, v, list_height.max(26.0 * 4.0), list_width, if triple_layout { 3 } else { 1 }, &mut acts));
     });
-    let auto_pos = if wide_layout {
+    let auto_pos = if triple_layout {
+        pos2(screen.width() - ds::EDGE - INFO_W, top + room - 180.0)
+    } else if wide_layout {
         pos2(ds::EDGE + LIST_W + 24.0, top)
     } else {
         pos2(ds::EDGE, (list.response.rect.bottom() + 16.0).max(top + 272.0))
@@ -172,15 +177,15 @@ pub fn show(ctx: &egui::Context, v: &View, st: &mut State) -> Vec<Act> {
     });
     egui::Area::new(egui::Id::new("rmh-info")).anchor(Align2::RIGHT_TOP, vec2(-ds::EDGE, top)).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
-        ds::panel(ui, PanelKind::Glass, 0.92, 16.0, |ui| info(ui, v, room - 32.0, &mut acts));
+        ds::panel(ui, PanelKind::Glass, 0.92, 16.0, |ui| info(ui, v, if triple_layout { room - 220.0 } else { room - 32.0 }, &mut acts));
     });
     acts
 }
 
 /// The category's title with its owned / known count, its known techs with their status at the right.
-fn list(ui: &mut Ui, v: &View, height: f32, acts: &mut Vec<Act>) {
+fn list(ui: &mut Ui, v: &View, height: f32, width: f32, columns: usize, acts: &mut Vec<Act>) {
     let k = ds::tokens();
-    let w = LIST_W - 32.0;
+    let w = width - 32.0;
     ui.set_width(w);
     ui.spacing_mut().item_spacing.y = 8.0;
     let area = v.areas.iter().find(|a| a.n == v.area);
@@ -192,8 +197,29 @@ fn list(ui: &mut Ui, v: &View, height: f32, acts: &mut Vec<Act>) {
     Text::new(area.map_or("", |a| a.name.as_str()), Font::PANEL_TITLE).baseline(base).paint(ui, r.with_max_x(r.right() - cw - 12.0));
     egui::ScrollArea::vertical().max_height(height).auto_shrink([false, true]).show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
-        for t in &v.techs {
-            let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
+        let gap = 12.0;
+        let col_width = ((w - gap * (columns - 1) as f32) / columns as f32).max(200.0);
+        let rows_per_col = (v.techs.len() + columns - 1) / columns;
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = gap;
+            for column in 0..columns {
+                ui.vertical(|ui| {
+                    ui.set_width(col_width);
+                    let start = column * rows_per_col;
+                    let end = (start + rows_per_col).min(v.techs.len());
+                    for t in &v.techs[start.min(end)..end] {
+                        tech_row(ui, v, t, col_width, acts);
+                    }
+                });
+            }
+        });
+    });
+}
+
+/// Draw one technology entry. The actual field ID is preserved for research actions.
+fn tech_row(ui: &mut Ui, v: &View, t: &Tech, row_width: f32, acts: &mut Vec<Act>) {
+    let k = ds::tokens();
+            let (r, resp) = ui.allocate_exact_size(vec2(row_width, 26.0), Sense::click());
             let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
             let hot = ds::hover_t(ui.ctx(), resp.id, resp.hovered());
             let on = t.field == v.field;
@@ -222,8 +248,6 @@ fn list(ui: &mut Ui, v: &View, height: f32, acts: &mut Vec<Act>) {
             if resp.clicked() {
                 acts.push(Act::Field(t.field));
             }
-        }
-    });
 }
 
 /// The auto-research switches as settings rows (`.sw`) with an on/off plate.
