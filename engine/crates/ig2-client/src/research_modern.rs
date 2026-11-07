@@ -156,7 +156,7 @@ pub fn show(ctx: &egui::Context, v: &View, st: &mut State) -> Vec<Act> {
     // This leaves almost the full vertical space available for the technology list.
     // On narrower displays, retain the original stacked layout.
     let wide_layout = screen.width() >= 1450.0;
-    let triple_layout = screen.width() >= 2200.0;
+    let triple_layout = screen.width() >= 1450.0;
     let available_list_width = (screen.width() - INFO_W - 3.0 * ds::EDGE - 24.0).max(LIST_W);
     let list_width = if triple_layout { available_list_width } else { LIST_W };
     let list_height = if wide_layout { room - 56.0 } else { room - 240.0 };
