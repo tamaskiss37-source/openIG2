@@ -159,7 +159,7 @@ pub fn show(ctx: &egui::Context, v: &View, st: &mut State) -> Vec<Act> {
     let triple_layout = screen.width() >= 1450.0;
     let available_list_width = (screen.width() - INFO_W - 3.0 * ds::EDGE - 24.0).max(LIST_W);
     let list_width = if triple_layout { available_list_width } else { LIST_W };
-    let list_height = if wide_layout { room - 56.0 } else { room - 240.0 };
+    let list_height = if wide_layout { room - 8.0 } else { room - 240.0 };
     let list = egui::Area::new(egui::Id::new("rmh-list")).fixed_pos(pos2(ds::EDGE, top)).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
         ds::panel(ui, PanelKind::Deep, 0.88, 16.0, |ui| list(ui, v, list_height.max(26.0 * 4.0), list_width, if triple_layout { 3 } else { 1 }, &mut acts));
@@ -195,7 +195,7 @@ fn list(ui: &mut Ui, v: &View, height: f32, width: f32, columns: usize, acts: &m
     let cw = Text::new(&count, Font::LABEL).layout(ui.ctx(), w * 0.45).width;
     Text::new(&count, Font::LABEL).right().color(k.ink_muted).baseline(base).paint(ui, r.with_min_x(r.right() - cw));
     Text::new(area.map_or("", |a| a.name.as_str()), Font::PANEL_TITLE).baseline(base).paint(ui, r.with_max_x(r.right() - cw - 12.0));
-    egui::ScrollArea::vertical().max_height(height).auto_shrink([false, true]).show(ui, |ui| {
+    egui::ScrollArea::vertical().max_height(height).auto_shrink([false, false]).show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
         let gap = 12.0;
         let col_width = ((w - gap * (columns - 1) as f32) / columns as f32).max(200.0);
