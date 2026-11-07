@@ -106,6 +106,7 @@ pub fn rules(mem: &Mem, st: &Statics) -> (BattleRules, Vec<Vec<i32>>) {
     let story = mem.global(0xf2748c);
     let r = BattleRules {
         weapons,
+        missile_destroyer_tech: None,
         forms,
         multiplayer: mem.global(0xbae2c0)[0] != 0,
         story_hit_bonus: i32_at(bonus, 0).wrapping_add(i32_at(bonus, 4)),
