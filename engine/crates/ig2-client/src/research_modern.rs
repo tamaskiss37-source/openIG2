@@ -152,12 +152,21 @@ pub fn show(ctx: &egui::Context, v: &View, st: &mut State) -> Vec<Act> {
         categories(ui, v, screen.width() - 2.0 * ds::EDGE, &mut acts)
     });
     let room = nav.response.rect.top() - 16.0 - top;
+    // On wide displays, move auto-research into the otherwise unused middle column.
+    // This leaves almost the full vertical space available for the technology list.
+    // On narrower displays, retain the original stacked layout.
+    let wide_layout = screen.width() >= 1450.0;
+    let list_height = if wide_layout { room - 56.0 } else { room - 240.0 };
     let list = egui::Area::new(egui::Id::new("rmh-list")).fixed_pos(pos2(ds::EDGE, top)).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
-        ds::panel(ui, PanelKind::Deep, 0.88, 16.0, |ui| list(ui, v, (room - 240.0).max(26.0 * 4.0), &mut acts));
+        ds::panel(ui, PanelKind::Deep, 0.88, 16.0, |ui| list(ui, v, list_height.max(26.0 * 4.0), &mut acts));
     });
-    let auto_top = (list.response.rect.bottom() + 16.0).max(top + 272.0);
-    egui::Area::new(egui::Id::new("rmh-auto")).fixed_pos(pos2(ds::EDGE, auto_top)).fade_in(false).show(ctx, |ui| {
+    let auto_pos = if wide_layout {
+        pos2(ds::EDGE + LIST_W + 24.0, top)
+    } else {
+        pos2(ds::EDGE, (list.response.rect.bottom() + 16.0).max(top + 272.0))
+    };
+    egui::Area::new(egui::Id::new("rmh-auto")).fixed_pos(auto_pos).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
         ds::panel(ui, PanelKind::Glass, 0.92, 16.0, |ui| auto(ui, v, &mut acts));
     });
