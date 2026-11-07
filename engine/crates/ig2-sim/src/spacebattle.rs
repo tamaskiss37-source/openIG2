@@ -222,6 +222,8 @@ pub struct BattleRules {
     /// `StoryAdat +0x78 + +0x7c`: the human's hit-chance bonus (SP), `+0x80 + +0x84`: damage bonus.
     pub story_hit_bonus: i32,
     pub story_damage_bonus: i32,
+    /// The modded hull whose torpedo launchers fire a second free projectile.
+    pub missile_destroyer_tech: Option<usize>,
     /// `IdoPause`: a paused battle only counts ticks.
     pub paused: bool,
     /// Debug switch 0xB77244: no battle AI.
@@ -255,6 +257,8 @@ pub struct SpaceRules {
     /// (tech, weapon).
     pub tech_like: Vec<u8>,
     pub added_weapons: Vec<(usize, usize)>,
+    /// Technology ID assigned to the optional Missile Destroyer mod.
+    pub missile_destroyer_tech: Option<usize>,
 }
 
 impl SpaceRules {
@@ -290,7 +294,7 @@ impl SpaceRules {
     /// The rules a battle tick reads, with the state's switches (`BattleRules`).
     /// The tick's rules with `weapons` (the table as the battle's setup left it).
     pub fn tick_rules(&self, weapons: Vec<WeaponRules>) -> BattleRules {
-        BattleRules { weapons, forms: self.forms.clone(), ..Default::default() }
+        BattleRules { weapons, forms: self.forms.clone(), missile_destroyer_tech: self.missile_destroyer_tech, ..Default::default() }
     }
 
     /// The setup's rules with `weapons` (the table as the battle's setup left it).
@@ -1163,6 +1167,14 @@ impl Battle {
                 self.rearm(t, u, m, true);
                 let (o, p) = (self.units[u].owner, self.units[u].pos);
                 self.fire(t, o, p, shot_kind::SHIP, u, target, w, c);
+                // Added Missile Destroyer: one free extra torpedo, without rearming twice.
+                // The weapon mask's torpedo group is 0xe000 (weapon IDs 13..=15).
+                // Resolve the hull by mod key at load time, never by a fixed tech slot.
+                if t.rules.missile_destroyer_tech == Some(self.units[u].model as usize)
+                    && (13..=15).contains(&w)
+                {
+                    self.fire(t, o, p, shot_kind::SHIP, u, target, w, c);
+                }
             }
         }
     }
