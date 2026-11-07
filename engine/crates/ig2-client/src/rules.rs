@@ -233,5 +233,6 @@ pub fn space_rules(inst: &Install, r: &ig2_rules::Rules) -> Result<SpaceRules, S
         building_hp: r.buildings.iter().map(|b| b.max_hp).collect(),
         tech_like: ig2_sim::spacewar::DesignRules::from_rules(r).tech_like,
         added_weapons: r.added_weapons.iter().map(|a| (a.tech, a.index)).collect(),
+        missile_destroyer_tech: r.added_techs.iter().find(|a| a.key == "missile_destroyer").map(|a| a.index),
     })
 }
