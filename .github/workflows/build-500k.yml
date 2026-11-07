@@ -1,0 +1,22 @@
+name: Build custom openIG2 500K
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable-x86_64-pc-windows-gnu
+      - name: Build Windows package
+        shell: bash
+        run: python -I tools/release/build_windows.py --out dist
+      - name: Upload custom Windows game
+        uses: actions/upload-artifact@v4
+        with:
+          name: openIG2-500k-windows
+          path: dist/*-windows-x64.zip
+          if-no-files-found: error
