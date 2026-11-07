@@ -544,6 +544,11 @@ impl<'r> Game<'r> {
             if mode == 3 {
                 money = m.i32(SK_MONEY) as f64;
             }
+            // Custom single-player balance: only the human empire starts with 500,000 credits.
+            // Keep AI empires, scenarios and multiplayer unchanged.
+            if (mode == 0 || mode == 3) && human(m, e) {
+                money = 500_000.0;
+            }
             m.set_f64(va::MONEY + 8 * e as u32, money);
             // The multiplayer galaxy only switches the humans on; the lobby set the others. A skirmish has no
             // computer empires past the eight players.
