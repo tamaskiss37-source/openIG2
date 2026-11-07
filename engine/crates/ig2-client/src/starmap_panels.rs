@@ -1574,7 +1574,7 @@ impl PanelModels {
                 }
                 let (vdir, tdir) = transfer_dirs(m.dir);
                 let mut name = m.name.clone().into_bytes();
-                if m.dir == 1 && hull < 12 && name.len() > 4 {
+                if m.dir == 1 && name.len() > 4 && (hull < 12 || name[4].is_ascii_digit()) {
                     name[4] = (b'0' + digit).min(b'8');
                 }
                 let name = String::from_utf8_lossy(&name).into_owned();
