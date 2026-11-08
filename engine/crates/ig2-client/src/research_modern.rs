@@ -152,26 +152,40 @@ pub fn show(ctx: &egui::Context, v: &View, st: &mut State) -> Vec<Act> {
         categories(ui, v, screen.width() - 2.0 * ds::EDGE, &mut acts)
     });
     let room = nav.response.rect.top() - 16.0 - top;
+    // Use the wider, three-column layout on desktop-sized screens.
+    let wide_layout = screen.width() >= 1450.0;
+    let triple_layout = screen.width() >= 1450.0;
+    let available_list_width = (screen.width() - INFO_W - 3.0 * ds::EDGE - 24.0).max(LIST_W);
+    let list_width = if triple_layout { available_list_width } else { LIST_W };
+    let list_height = if wide_layout { room - 8.0 } else { room - 240.0 };
     let list = egui::Area::new(egui::Id::new("rmh-list")).fixed_pos(pos2(ds::EDGE, top)).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
-        ds::panel(ui, PanelKind::Deep, 0.88, 16.0, |ui| list(ui, v, (room - 240.0).max(26.0 * 4.0), &mut acts));
+        ds::panel(ui, PanelKind::Deep, 0.88, 16.0, |ui| {
+            list(ui, v, list_height.max(26.0 * 4.0), list_width, if triple_layout { 3 } else { 1 }, &mut acts)
+        });
     });
-    let auto_top = (list.response.rect.bottom() + 16.0).max(top + 272.0);
-    egui::Area::new(egui::Id::new("rmh-auto")).fixed_pos(pos2(ds::EDGE, auto_top)).fade_in(false).show(ctx, |ui| {
+    let auto_pos = if triple_layout {
+        pos2(screen.width() - ds::EDGE - INFO_W, top + room - 180.0)
+    } else if wide_layout {
+        pos2(ds::EDGE + LIST_W + 24.0, top)
+    } else {
+        pos2(ds::EDGE, (list.response.rect.bottom() + 16.0).max(top + 272.0))
+    };
+    egui::Area::new(egui::Id::new("rmh-auto")).fixed_pos(auto_pos).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
         ds::panel(ui, PanelKind::Glass, 0.92, 16.0, |ui| auto(ui, v, &mut acts));
     });
     egui::Area::new(egui::Id::new("rmh-info")).anchor(Align2::RIGHT_TOP, vec2(-ds::EDGE, top)).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
-        ds::panel(ui, PanelKind::Glass, 0.92, 16.0, |ui| info(ui, v, room - 32.0, &mut acts));
+        ds::panel(ui, PanelKind::Glass, 0.92, 16.0, |ui| info(ui, v, if triple_layout { room - 220.0 } else { room - 32.0 }, &mut acts));
     });
     acts
 }
 
 /// The category's title with its owned / known count, its known techs with their status at the right.
-fn list(ui: &mut Ui, v: &View, height: f32, acts: &mut Vec<Act>) {
+fn list(ui: &mut Ui, v: &View, height: f32, width: f32, columns: usize, acts: &mut Vec<Act>) {
     let k = ds::tokens();
-    let w = LIST_W - 32.0;
+    let w = width - 32.0;
     ui.set_width(w);
     ui.spacing_mut().item_spacing.y = 8.0;
     let area = v.areas.iter().find(|a| a.n == v.area);
@@ -181,40 +195,59 @@ fn list(ui: &mut Ui, v: &View, height: f32, acts: &mut Vec<Act>) {
     let cw = Text::new(&count, Font::LABEL).layout(ui.ctx(), w * 0.45).width;
     Text::new(&count, Font::LABEL).right().color(k.ink_muted).baseline(base).paint(ui, r.with_min_x(r.right() - cw));
     Text::new(area.map_or("", |a| a.name.as_str()), Font::PANEL_TITLE).baseline(base).paint(ui, r.with_max_x(r.right() - cw - 12.0));
-    egui::ScrollArea::vertical().max_height(height).auto_shrink([false, true]).show(ui, |ui| {
+    egui::ScrollArea::vertical().max_height(height).auto_shrink([false, false]).show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
-        for t in &v.techs {
-            let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
-            let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-            let hot = ds::hover_t(ui.ctx(), resp.id, resp.hovered());
-            let on = t.field == v.field;
-            ds::row_back(ui, r, hot, on);
-            let inner = r.shrink2(vec2(8.0, 0.0));
-            let base = ds::fit::baseline(r, Font::BODY);
-            // The status at the right: done, the bar and per cent, the cost, locked.
-            let (right_w, col) = match t.status {
-                5 => (Text::new(&v.labels.done, STATUS).right().color(k.ink_muted).baseline(base).paint(ui, inner.with_min_x(inner.right() - 120.0)).width, k.ink),
-                4 => {
-                    let pct = format!("{}%", t.pct);
-                    let pr = Rect::from_min_max(pos2(inner.right() - 44.0, r.top()), inner.max);
-                    Text::new(&pct, Font::READOUT.sized(15.0).tracking(0.04)).right().color(k.lcd_ink).baseline(base).paint(ui, pr);
-                    let b = Rect::from_center_size(pos2(pr.left() - 8.0 - 60.0, r.center().y), vec2(120.0, 6.0));
-                    let p = ui.painter();
-                    p.rect_filled(b, 3, k.glass);
-                    p.rect_filled(b.with_max_x(b.left() + (b.width() * t.pct as f32 / 100.0).max(6.0)), 3, k.lcd_ink);
-                    ds::rim(p, b, 3, k.rim);
-                    (44.0 + 8.0 + 120.0, k.ink)
-                }
-                3 => (Text::new(&t.cost, STATUS).right().color(k.info).baseline(base).paint(ui, inner.with_min_x(inner.right() - 140.0)).width, k.ink),
-                _ => (Text::new(&v.labels.locked, STATUS).right().color(k.ink_muted).baseline(base).paint(ui, inner.with_min_x(inner.right() - 120.0)).width, k.ink_muted),
-            };
-            let name_box = inner.with_max_x(inner.right() - right_w - 12.0);
-            Text::new(&t.name, Font::BODY).color(col.lerp_to_gamma(Color32::WHITE, hot * 0.5)).baseline(base).paint(ui, name_box);
-            if resp.clicked() {
-                acts.push(Act::Field(t.field));
+        let gap = 12.0;
+        let col_width = ((w - gap * (columns - 1) as f32) / columns as f32).max(200.0);
+        let rows_per_col = v.techs.len().div_ceil(columns);
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = gap;
+            for column in 0..columns {
+                ui.vertical(|ui| {
+                    ui.set_width(col_width);
+                    let start = column * rows_per_col;
+                    let end = (start + rows_per_col).min(v.techs.len());
+                    for t in &v.techs[start.min(end)..end] {
+                        tech_row(ui, v, t, col_width, acts);
+                    }
+                });
             }
-        }
+        });
     });
+}
+
+/// One clickable technology entry, shared by all list columns.
+fn tech_row(ui: &mut Ui, v: &View, t: &Tech, width: f32, acts: &mut Vec<Act>) {
+    let k = ds::tokens();
+    let (r, resp) = ui.allocate_exact_size(vec2(width, 26.0), Sense::click());
+    let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+    let hot = ds::hover_t(ui.ctx(), resp.id, resp.hovered());
+    let on = t.field == v.field;
+    ds::row_back(ui, r, hot, on);
+    let inner = r.shrink2(vec2(8.0, 0.0));
+    let base = ds::fit::baseline(r, Font::BODY);
+    // The status at the right: done, the bar and per cent, the cost, locked.
+    let (right_w, col) = match t.status {
+        5 => (Text::new(&v.labels.done, STATUS).right().color(k.ink_muted).baseline(base).paint(ui, inner.with_min_x(inner.right() - 120.0)).width, k.ink),
+        4 => {
+            let pct = format!("{}%", t.pct);
+            let pr = Rect::from_min_max(pos2(inner.right() - 44.0, r.top()), inner.max);
+            Text::new(&pct, Font::READOUT.sized(15.0).tracking(0.04)).right().color(k.lcd_ink).baseline(base).paint(ui, pr);
+            let b = Rect::from_center_size(pos2(pr.left() - 8.0 - 60.0, r.center().y), vec2(120.0, 6.0));
+            let p = ui.painter();
+            p.rect_filled(b, 3, k.glass);
+            p.rect_filled(b.with_max_x(b.left() + (b.width() * t.pct as f32 / 100.0).max(6.0)), 3, k.lcd_ink);
+            ds::rim(p, b, 3, k.rim);
+            (44.0 + 8.0 + 120.0, k.ink)
+        }
+        3 => (Text::new(&t.cost, STATUS).right().color(k.info).baseline(base).paint(ui, inner.with_min_x(inner.right() - 140.0)).width, k.ink),
+        _ => (Text::new(&v.labels.locked, STATUS).right().color(k.ink_muted).baseline(base).paint(ui, inner.with_min_x(inner.right() - 120.0)).width, k.ink_muted),
+    };
+    let name_box = inner.with_max_x(inner.right() - right_w - 12.0);
+    Text::new(&t.name, Font::BODY).color(col.lerp_to_gamma(Color32::WHITE, hot * 0.5)).baseline(base).paint(ui, name_box);
+    if resp.clicked() {
+        acts.push(Act::Field(t.field));
+    }
 }
 
 /// The auto-research switches as settings rows (`.sw`) with an on/off plate.
@@ -578,8 +611,8 @@ mod tests {
             assert!(acts.is_empty());
             let r = |id: &str| ctx.memory(|m| m.area_rect(egui::Id::new(id))).unwrap();
             let (l, a, i, n) = (r("rmh-list"), r("rmh-auto"), r("rmh-info"), r("rmh-areas"));
-            assert!((l.width() - LIST_W).abs() < 1.0 && (i.width() - INFO_W).abs() < 1.0, "{w}: {l:?} {i:?}");
-            assert!(l.bottom() < a.top() && a.bottom() < n.top() && i.bottom() < n.top(), "{w}");
+            assert!((l.width() - if w >= 1450.0 { (w - INFO_W - 3.0 * ds::EDGE - 24.0).max(LIST_W) } else { LIST_W }).abs() < 1.0 && (i.width() - INFO_W).abs() < 1.0, "{w}: {l:?} {i:?}");
+            assert!((w >= 1450.0 || l.bottom() < a.top()) && a.bottom() < n.top() && i.bottom() < n.top(), "{w}");
             assert!(i.right() <= w - ds::EDGE + 0.5 && n.right() <= w - ds::EDGE + 0.5, "{w}: {n:?}");
         }
     }
@@ -589,7 +622,7 @@ mod tests {
     fn long_names_keep_the_panels() {
         let (ctx, _) = run(&view(&"Very long translated research name ".repeat(5)), &mut State::default(), Vec::new(), 1920.0);
         let r = |id: &str| ctx.memory(|m| m.area_rect(egui::Id::new(id))).unwrap();
-        assert!((r("rmh-list").width() - LIST_W).abs() < 1.0 && (r("rmh-info").width() - INFO_W).abs() < 1.0);
+        assert!((r("rmh-list").width() - (1920.0 - INFO_W - 3.0 * ds::EDGE - 24.0).max(LIST_W)).abs() < 1.0 && (r("rmh-info").width() - INFO_W).abs() < 1.0);
     }
 
     #[test]
