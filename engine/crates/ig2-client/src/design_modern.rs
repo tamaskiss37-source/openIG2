@@ -135,7 +135,8 @@ pub fn show(ctx: &egui::Context, v: &View, st: &mut State) -> Vec<Act> {
         ds::panel(ui, PanelKind::Glass, 0.92, 16.0, |ui| properties(ui, v, &mut acts));
     });
     let room = props.response.rect.top() - 16.0 - top;
-    egui::Area::new(egui::Id::new("dmh-list")).fixed_pos(pos2(ds::EDGE, top)).fade_in(false).show(ctx, |ui| {
+    // Keep selectable designs above non-interactive neighbouring panels for pointer hit-testing.
+    egui::Area::new(egui::Id::new("dmh-list")).order(egui::Order::Foreground).fixed_pos(pos2(ds::EDGE, top)).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
         ds::panel(ui, PanelKind::Deep, 0.88, 16.0, |ui| list(ui, v, room - 32.0 - 34.0, &mut acts));
     });
@@ -157,7 +158,8 @@ pub fn show(ctx: &egui::Context, v: &View, st: &mut State) -> Vec<Act> {
     // Too narrow for it between them (a large UI scale): above the exit instead.
     let fits = cw <= screen.width() - 2.0 * ds::EDGE - LIST_W - 320.0 - 32.0;
     let (pivot, at) = if fits { (Align2::CENTER_BOTTOM, vec2(centre, -ds::EDGE)) } else { (Align2::RIGHT_BOTTOM, vec2(-ds::EDGE, -ds::EDGE - 56.0 - 12.0)) };
-    let console = egui::Area::new(egui::Id::new("dmh-console")).anchor(pivot, at).fade_in(false).show(ctx, |ui| {
+    // Keep console controls in the same foreground layer as the ship list.
+    let console = egui::Area::new(egui::Id::new("dmh-console")).order(egui::Order::Foreground).anchor(pivot, at).fade_in(false).show(ctx, |ui| {
         ds::entrance(ui);
         console(ui, v, &mut acts)
     });
