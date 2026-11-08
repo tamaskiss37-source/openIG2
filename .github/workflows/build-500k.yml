@@ -1,0 +1,46 @@
+
+name: Build Custom openIG2 500K
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Build Windows Game
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable-x86_64-pc-windows-gnu
+
+      - name: Check MinGW compiler
+        shell: bash
+        run: |
+          g++ --version
+          g++ -print-file-name=libstdc++.a
+
+      - name: Set build version
+        shell: bash
+        run: |
+          v=$(python -I tools/release/version.py)
+          echo "OPENIG2_VERSION=$v" >> "$GITHUB_ENV"
+
+      - name: Build Windows package
+        shell: bash
+        run: python -I tools/release/build_windows.py --out dist
+
+      - name: Upload playable game
+        uses: actions/upload-artifact@v4
+        with:
+          name: openIG2-Improved-start-500K-Windows
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30
